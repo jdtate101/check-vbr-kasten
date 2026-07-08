@@ -1,4 +1,3 @@
-[README.md](https://github.com/user-attachments/files/29752758/README.md)
 # check-vbr-ports.sh
 
 Checks TCP connectivity from an RKE2 worker node to a Veeam Backup & Replication (VBR) server and repository, for validating network prerequisites ahead of Veeam Kasten integration.
@@ -10,6 +9,7 @@ Reference: [VBR Kasten Integration Guide – Used Ports](https://helpcenter.veea
 | Target | Port(s) | Purpose |
 |---|---|---|
 | VBR server | 9419 | VBR REST API |
+| VBR server | 443 | VBR 13+: OAuth2 component fetches a certificate via this port to authenticate API access |
 | Repository | 10006 | vmb api port (datamover → repository) |
 | Repository | 6162 | veeamtransport (repository management) |
 | Repository | 2500–3300 | veeamagent data transfer (dynamic, job-only) |
@@ -43,7 +43,7 @@ If VBR and Repository are the same server, just press Enter at the Repository pr
 ## Reading the results
 
 - `OPEN` / `CLOSED` is printed per port.
-- **9419, 10006, and 6162 should all show OPEN** if the network path is clear. If any show CLOSED, check for firewall/ACL/NSG rules between the worker node subnet and the VBR host on that specific port.
+- **9419, 443, 10006, and 6162 should all show OPEN** if the network path is clear. If any show CLOSED, check for firewall/ACL/NSG rules between the worker node subnet and the VBR host on that specific port. Note: 443 is only required from VBR 13 onward (OAuth2 certificate retrieval) — on earlier VBR versions it's not applicable.
 - **The 2500–3300 range will show CLOSED at idle — this is expected, not a fault.** Veeam only opens ports in this range dynamically, for the duration of an active backup or restore job. An all-CLOSED result here with no job running is the correct baseline, not a network problem. To validate this range specifically, re-run the scan while a Kasten backup or restore is actively in progress against that repository — you should then see a handful of ports in the range flip to OPEN.
 
 ## Notes
