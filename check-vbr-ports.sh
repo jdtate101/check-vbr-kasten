@@ -2,7 +2,7 @@
 #
 # check-vbr-ports.sh
 #
-# Validates TCP connectivity from an RKE2 worker node to the VBR server,
+# Validates TCP connectivity from an RKE2 worker node to Veeam infrastructure,
 # per the "Used Ports" tables in KB4626 and the VBR Kasten Integration Guide:
 # https://helpcenter.veeam.com/docs/vbr/kasten_integration/used_ports.html
 #
@@ -15,6 +15,17 @@
 #   10006  - vmb api port (datamover -> repository)
 #   6162   - veeamtransport (repository management port)
 #   2500-3300 - veeamagent data transfer port range
+#
+# Optional export-type checks (only run if the corresponding *_HOST variable
+# is set - unset/empty means skip, so you only check what's actually in use):
+#   NFS_HOST  -> 111 (rpcbind), 2049 (nfsd)
+#   S3_HOST   -> 443 (HTTPS S3 endpoint)
+#   SMB_HOST  -> 445 (SMB over TCP)
+#   EXTRA_CHECKS -> comma-separated host:port pairs for anything not covered
+#                   above, e.g. "iscsi.lab.home:3260,other.host:1234"
+# Set these as environment variables (export NFS_HOST=..., or via the
+# DaemonSet's ConfigMap - see DEPLOY.md) rather than script arguments, since
+# the number of optional export types can grow without changing the CLI.
 #
 # The check itself tries, in order: nc, python3, bash's /dev/tcp.
 # This matters because /dev/tcp is disabled in some bash builds (notably
@@ -33,6 +44,14 @@ REPO_HOST="${2:-}"
 TIMEOUT="${3:-1}"
 PARALLEL="${4:-50}"
 
+# NFS_HOST / S3_HOST / SMB_HOST / EXTRA_CHECKS come from the environment
+# (export before running, or via the DaemonSet ConfigMap). Not treated as
+# positional args - keeps the CLI stable as more export types get added.
+NFS_HOST="${NFS_HOST:-}"
+S3_HOST="${S3_HOST:-}"
+SMB_HOST="${SMB_HOST:-}"
+EXTRA_CHECKS="${EXTRA_CHECKS:-}"
+
 if [ -z "$VBR_HOST" ]; then
     read -rp "Enter VBR server IP or DNS name: " VBR_HOST
 fi
@@ -41,6 +60,15 @@ if [ -z "$REPO_HOST" ]; then
     read -rp "Enter Repository IP or DNS name (press Enter if same as VBR server): " REPO_HOST
     REPO_HOST="${REPO_HOST:-$VBR_HOST}"
 fi
+
+# Every line printed from here on is prefixed with the node name, so that
+# when logs from many pods/nodes are combined (e.g. `kubectl logs -l ...
+# --all-containers`), each line is self-identifying without needing to
+# cross-reference container IDs back to nodes separately.
+# NODE_NAME is injected via the Downward API in the DaemonSet (spec.nodeName);
+# falls back to hostname for standalone/SSH runs where that's accurate.
+NODE_NAME="${NODE_NAME:-$(hostname)}"
+exec > >(sed "s/^/[${NODE_NAME}] /") 2>&1
 
 # Pick the best available method once, up front, and report it so it's obvious
 # which check technique produced the results below.
@@ -91,9 +119,12 @@ export -f check_port
 export TIMEOUT METHOD
 
 echo "=================================================="
-echo " VBR/Kasten connectivity check from $(hostname)"
+echo " VBR/Kasten connectivity check from ${NODE_NAME}"
 echo " VBR server:  ${VBR_HOST}"
 echo " Repository:  ${REPO_HOST}"
+[ -n "$NFS_HOST" ] && echo " NFS export:  ${NFS_HOST}"
+[ -n "$S3_HOST" ]  && echo " S3 endpoint: ${S3_HOST}"
+[ -n "$SMB_HOST" ] && echo " SMB share:   ${SMB_HOST}"
 echo " $(date)"
 echo "=================================================="
 
@@ -121,6 +152,42 @@ if [ "$CLOSED_COUNT" -gt 0 ]; then
     echo
     echo "Closed/unreachable ports (showing up to 15):"
     echo "$RESULTS" | grep '^CLOSED' | head -15
+fi
+
+# --- Optional export-type checks: only run for whichever *_HOST is set ---
+
+if [ -n "$NFS_HOST" ]; then
+    echo
+    echo "--- NFS export ports (${NFS_HOST}) ---"
+    check_port "$NFS_HOST" 111
+    check_port "$NFS_HOST" 2049
+fi
+
+if [ -n "$S3_HOST" ]; then
+    echo
+    echo "--- S3 endpoint port (${S3_HOST}) ---"
+    check_port "$S3_HOST" 443
+fi
+
+if [ -n "$SMB_HOST" ]; then
+    echo
+    echo "--- SMB share port (${SMB_HOST}) ---"
+    check_port "$SMB_HOST" 445
+fi
+
+if [ -n "$EXTRA_CHECKS" ]; then
+    echo
+    echo "--- Extra checks ---"
+    IFS=',' read -ra PAIRS <<< "$EXTRA_CHECKS"
+    for pair in "${PAIRS[@]}"; do
+        ehost="${pair%%:*}"
+        eport="${pair##*:}"
+        if [ -n "$ehost" ] && [ -n "$eport" ] && [ "$ehost" != "$pair" ]; then
+            check_port "$ehost" "$eport"
+        else
+            echo "Skipping malformed EXTRA_CHECKS entry: '${pair}' (expected host:port)"
+        fi
+    done
 fi
 
 echo
