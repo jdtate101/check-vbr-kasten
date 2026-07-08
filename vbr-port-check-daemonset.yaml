@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: vbr-port-check
+  namespace: default
+  labels:
+    app: vbr-port-check
+spec:
+  selector:
+    matchLabels:
+      app: vbr-port-check
+  template:
+    metadata:
+      labels:
+        app: vbr-port-check
+    spec:
+      # hostNetwork is required: this must test connectivity from the
+      # worker node's own network path, not the pod/CNI overlay network.
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      # No tolerations added on purpose: RKE2 control-plane nodes carry a
+      # NoSchedule taint by default, so a plain DaemonSet like this will
+      # naturally land only on worker nodes. If this cluster has combined
+      # master+worker nodes (no taint), add a nodeSelector below instead,
+      # e.g. matching node-role.kubernetes.io/worker: "true".
+      containers:
+        - name: vbr-port-check
+          image: <DOCKERHUB_USERNAME>/vbr-port-check:latest
+          # Positional args match the script: VBR_HOST REPO_HOST TIMEOUT PARALLEL
+          args:
+            - "192.168.1.153"   # VBR server IP or DNS name
+            - "192.168.1.153"   # Repository IP or DNS name
+            - "1"               # timeout in seconds
+            - "50"              # parallelism for the port-range scan
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 64Mi
