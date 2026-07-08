@@ -18,7 +18,7 @@ The VBR server and Repository can be the same host or different hosts — you're
 
 ## Requirements
 
-None to install. The script auto-detects the best available tool on the node, in this order: `nc` → `python3` → bash's built-in `/dev/tcp`. Almost every RKE2 node will have at least one of these already.
+None to install. The script auto-detects the best available tool on the node, in this order: `nc` → `python3` → bash's built-in `/dev/tcp`. Almost every k8s node will have at least one of these already. If you are using very restricted hosts with a minimal command set, then look to use the container image version instead.
 
 ## Usage
 
