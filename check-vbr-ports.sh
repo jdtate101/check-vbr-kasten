@@ -8,6 +8,8 @@
 #
 # Checked against the VBR server:
 #   9419   - VBR REST API port
+#   443    - Required from VBR 13 onward: OAuth2 component fetches a
+#            certificate via this port to authenticate API access.
 #
 # Checked against the Repository (may be the same host as VBR, or separate):
 #   10006  - vmb api port (datamover -> repository)
@@ -96,8 +98,9 @@ echo " $(date)"
 echo "=================================================="
 
 echo
-echo "--- VBR server port ---"
+echo "--- VBR server ports ---"
 check_port "$VBR_HOST" 9419
+check_port "$VBR_HOST" 443
 
 echo
 echo "--- Repository ports ---"
