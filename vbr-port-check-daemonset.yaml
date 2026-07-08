@@ -25,7 +25,7 @@ spec:
       # e.g. matching node-role.kubernetes.io/worker: "true".
       containers:
         - name: vbr-port-check
-          image: <DOCKERHUB_USERNAME>/vbr-port-check:latest
+          image: <PRIVATE CONTAINER REPO>/vbr-port-check:latest
           # Positional args match the script: VBR_HOST REPO_HOST TIMEOUT PARALLEL
           args:
             - "192.168.1.153"   # VBR server IP or DNS name
