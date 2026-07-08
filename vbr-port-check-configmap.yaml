@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vbr-port-check-config
+  namespace: default
+data:
+  # Leave a value empty (or delete the line) to skip that export-type check
+  # entirely. Only set the ones actually in use for this environment.
+  NFS_HOST: ""              # e.g. "nfs.lab.home" - checks 111 + 2049
+  S3_HOST: ""                # e.g. "s3.lab.home"  - checks 443
+  SMB_HOST: ""               # e.g. "smb.lab.home" - checks 445
+  EXTRA_CHECKS: ""           # e.g. "iscsi.lab.home:3260,other.host:1234"
