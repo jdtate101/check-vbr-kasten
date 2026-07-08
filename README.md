@@ -1,6 +1,6 @@
 # check-vbr-ports.sh
 
-Checks TCP connectivity from an RKE2 worker node to a Veeam Backup & Replication (VBR) server and repository, for validating network prerequisites ahead of Veeam Kasten integration.
+Checks TCP connectivity from an k8s worker node to a Veeam Backup & Replication (VBR) server and repository, for validating network prerequisites ahead of Veeam Kasten integration.
 
 Reference: [VBR Kasten Integration Guide – Used Ports](https://helpcenter.veeam.com/docs/vbr/kasten_integration/used_ports.html)
 
